@@ -3,7 +3,7 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-16 19:38]
+#     Last Modified       :     [2018-07-17 18:57]
 #     Description         :      
 #################################################################################
 
@@ -33,52 +33,70 @@ parser = argparse.ArgumentParser(usage=USAGE, description=DESC)
 
 # Group of arguments
 group = parser.add_mutually_exclusive_group(required=True)
-group.add_argument('-r', '--remove-group', dest='modify', action='store_true', help='Delete a group without members')
-group.add_argument('-n', '--new-group', dest='modify', action='store_true', help='Create a new group')
-group.add_argument('-d', '--delete-user', dest='modify', action='store_true', help='Remove user as group member')
-group.add_argument('-a', '--add-user', dest='modify', action='store_true', help='Add user as group member')
+group.add_argument('-r', '--remove-group', dest='modify', action='store_const', const='delete', help='Delete a group without members')
+group.add_argument('-n', '--new-group', dest='modify', action='store_const', const='add', help='Create a new group')
+group.add_argument('-d', '--delete-user', dest='modify', action='store_const', const='modify del', help='Remove user as group member')
+group.add_argument('-a', '--add-user', dest='modify', action='store_const', const='modify add', help='Add user as group member')
 
-default_user = 'cn={user},{ou}'.format(user=os.environ.get('USER'), ou=usuarios)
-parser.add_argument('-u', '--user', default=default_user)
-parser.add_argument('-D', '--binddn')
-parser.add_argument('-w', '--bindpw')
+parser.add_argument('-u', '--user', dest='user')
+default_binddn = 'cn={user},{ou}'.format(user=os.environ.get('USER'), ou=usuarios)
+parser.add_argument('-D', '--binddn', dest='binddn', default=default_binddn)
+parser.add_argument('-w', '--bindpw', dest='bindpw')
+parser.add_argument('group')
 
-args = parser.parse_args()
 
 class Config:
-    def __init__(self):
-        self.user_config = os.path.join(os.environ.get('HOME'), '.ldap')
-        Config.check_configfile(self.user_config)
+    def __init__(self, parser):
+        self.args = parser.parse_args()
 
-    @staticmethod
-    def check_configfile(user_config):
-        if not os.path.isfile(user_config):
-            from textwrap import dedent
-            print('Configuration file not found\nPlease configure the file %s as bellow:' % user_config)
-            config_example = dedent('''
-                # Required
-                [ldap]
-                base = dc=soc
-                server = 127.0.0.1
-                port = 389
-                ou_groups = ou=grupos,dc=soc
+    @property
+    def changetype(self):
+        return self.args.modify
 
-                [user]
-                username = cn=a0046772,ou=usuarios,dc=soc
-                # Optional
-                ; This information will be asked it not found in this file
-                password = secret
-            ''')
-            print(config_example.lstrip())
-            sys.exit(1)
+    @property
+    def user(self):
+        if self.args.modify in ['modify del', 'modify add']:
+            try:
+                if usuarios in self.args.user:
+                    return self.args.user
+                else:
+                    return 'cn=%s,%s' % (self.args.user, usuarios)
+            except Exception:
+                print('Error: -u user is required')
+                os.exit(1)
+        else:
+            return None
 
-config = Config()
-server = Server(server, port=port, get_info=ALL)
-conn = Connection(server, user=usuario, password=senha)
+    @property
+    def group(self):
+        if grupos in self.args.group:
+            return self.args.group
+        else:
+            return 'cn=%s,%s' % (self.args.group, grupos)
 
-def connect():
+    @property
+    def binddn(self):
+        return self.args.binddn
+
+    @property
+    def bindpw(self):
+        if self.args.bindpw:
+            return self.args.bindpw
+        else:
+            self.args.bindpw = getpass('%s password: ' % str(self.binddn))
+            return self.args.bindpw
+
+
+def connect(conn):
     if conn.bind():
+        print(conn.result)
         return conn
     else:
         print('Usuario ou senha invalido: %s' % conn.result)
         return False
+
+if __name__ == '__main__':
+    config = Config(parser)
+    server = Server(server, port=port, get_info=ALL)
+    conn = Connection(server, user=config.binddn, password=config.bindpw)
+    connect(conn)
