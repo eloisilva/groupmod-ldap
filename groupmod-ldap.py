@@ -3,7 +3,7 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-19 01:29]
+#     Last Modified       :     [2018-07-19 01:37]
 #     Description         :      
 #################################################################################
 
@@ -68,7 +68,7 @@ class Config:
         self.args = parser.parse_args()
         self.server = '127.0.0.1'
         self.port = 389
-        self.base = 'dc=soc'
+        self.base = 'dc=anime,dc=org'
         self.usuarios = 'ou=usuarios,{base}'.format(base=self.base)
         self.grupos = 'ou=grupos,{base}'.format(base=self.base)
 
