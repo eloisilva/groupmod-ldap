@@ -1,8 +1,9 @@
 [ldap]
-base = dc=soc
 server = 127.0.0.1
 port = 389
-ou_groups = ou=grupos,dc=soc
+base = dc=anime,dc=org
+rdn_groups = ou=grupos
+rdn_users = ou=usuarios
 
 [user]
-username = cn=a0046772,ou=usuarios,dc=soc
+username = maloy
