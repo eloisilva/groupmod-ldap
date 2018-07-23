@@ -3,7 +3,7 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-19 01:37]
+#     Last Modified       :     [2018-07-22 21:49]
 #     Description         :      
 #################################################################################
 
@@ -14,7 +14,7 @@ from getpass import getpass
 
 # Argument Parser
 DESC = 'Add/Delete/Change LDAP Group'
-USAGE = '''groupadd-ldap -h
+USAGE = '''{progname} -h
 {progname} -r group # remove a empty group
 {progname} -n group # create a new group
 {progname} -d -u member-user group # delete member-user from group
@@ -68,15 +68,59 @@ class Config:
         self.args = parser.parse_args()
         self.server = '127.0.0.1'
         self.port = 389
-        self.base = 'dc=anime,dc=org'
-        self.usuarios = 'ou=usuarios,{base}'.format(base=self.base)
-        self.grupos = 'ou=grupos,{base}'.format(base=self.base)
+        self.base = 'dc=soc'
+        self.ou_users = 'ou=usuarios,{base}'.format(base=self.base)
+        self.ou_groups = 'ou=grupos,{base}'.format(base=self.base)
 
     def add(self, conn):
-        print(self.changetype, self.binddn, self.bindpw, self.group)
+        cn = self.group.split(',')[0]
+        search = {
+                'search_base': self.ou_groups,
+                'search_filter': '(&(objectClass=posixGroup)(%s))' % cn
+        }
+        if not conn.search(**search):
+            try:
+                gid = self.nid_value(conn, self.ou_groups, 'gidNumber', 'posixGroup')
+            except:
+                print('[Error]  trying to get next gidNumber: ', conn.result)
+            else:
+                conn.add(self.group, 'posixGroup', {'gidNumber': gid})
+                conn.search(**search)
+                print('[Group add] -', conn.entries[0].entry_dn)
+        else:
+            print('[Error] : The group %s already existe' % self.group)
 
     def delete(self, conn):
-        print(self.changetype, self.binddn, self.bindpw, self.group)
+        cn = self.group.split(',')[0]
+        search = {
+                'search_base': self.ou_groups,
+                'search_filter': '(&(objectClass=posixGroup)(%s))' % cn,
+                'attributes': 'gidNumber'
+        }
+        if conn.search(**search):
+            gid = conn.entries[0].gidNumber.value
+            search_0 = {
+                    'search_base': self.ou_groups,
+                    'search_filter': '(&(objectClass=posixGroup)(%s)(memberUid=*))' % cn,
+                    'attributes': ['memberUid']
+            }
+            search_1 = {
+                    'search_base': self.base,
+                    'search_filter': '(&(objectClass=posixAccount)(gidNumber=%s))' % gid
+            }
+            if conn.search(**search_0):
+                print('[Error] : Group with members, remove the memberUid before delete this group')
+                print('  Members: %s' % conn.entries[0].memberUid.value)
+            elif conn.search(**search_1):
+                print('[Error] : Group with members, some user(s) has this group as primary group')
+                print('  DN users:')
+                for user in [u.entry_dn for u in conn.entries]: print('         %s' % user)
+            else:
+                conn.delete(self.group)
+                if not conn.search(**search):
+                    print('[Group deleted] -', self.group)
+        else:
+            print('[Error] : The group %s does not existe' % self.group)
 
     def del_member(self, conn):
         print(self.changetype, self.binddn, self.bindpw, self.user, self.group)
@@ -97,18 +141,18 @@ class Config:
 
     @property
     def user(self):
-        return self.dn(self.args.user, self.usuarios)
+        return self.dn(self.args.user, self.ou_users)
 
     @property
     def group(self):
-        return self.dn(self.args.group, self.grupos)
+        return self.dn(self.args.group, self.ou_groups)
 
     @property
     def binddn(self):
         if not self.args.binddn:
-            return 'cn={user},{ou}'.format(user=os.environ.get('USER'), ou=self.usuarios)
+            return 'cn={user},{ou}'.format(user=os.environ.get('USER'), ou=self.ou_users)
         else:
-            return self.dn(self.args.binddn, self.usuarios)
+            return self.dn(self.args.binddn, self.ou_users)
 
     @property
     def bindpw(self):
@@ -125,14 +169,23 @@ class Config:
         else:
             return 'cn=%s,%s' % (cn, ou)
 
+    @staticmethod
+    def nid_value(conn, base, attribute, objectclass):
+        search = {
+            'search_base': base,
+            'search_filter': '(&(objectClass={obj})({attr}=*))'.format(obj=objectclass, attr=attribute),
+            'attributes': [attribute]
+        }
+        conn.search(**search)
+        return sorted([nid.gidnumber.value for nid in conn.entries])[-1] + 1
+
 def connect(config):
     server = Server(config.server, port=config.port, get_info=ALL)
     conn = Connection(server, user=config.binddn, password=config.bindpw)
     if conn.bind():
-        print('[Ok] LDAP Connected...')
+        print('[LDAP] - Conneted')
         return conn
     else:
-        #print('Usuario ou senha invalido: %s' % conn.result)
         print('Usuario ou senha invalido:')
         return False
 
