@@ -12,9 +12,9 @@ clean-py:
 clean-all: clean-py clean
 
 test:
-	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -r grp1
 	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -n grp1
-	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -d -u maloy grp1
-	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -a -u maloy grp1
+	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -r grp1
+	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -a -u a0046772 grp1
+	@/usr/bin/python3 groupmod-ldap.py -D a0046772 -w x -d -u a0046772 grp1
 
 all: clean-all test

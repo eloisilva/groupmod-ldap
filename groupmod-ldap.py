@@ -3,13 +3,13 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-22 21:49]
+#     Last Modified       :     [2018-07-24 23:10]
 #     Description         :      
 #################################################################################
 
 import os, sys
 import argparse, ldap3
-from ldap3 import Server, Connection, ALL
+from ldap3 import Server, Connection, ALL, MODIFY_ADD, MODIFY_DELETE
 from getpass import getpass
 
 # Argument Parser
@@ -113,8 +113,8 @@ class Config:
                 print('  Members: %s' % conn.entries[0].memberUid.value)
             elif conn.search(**search_1):
                 print('[Error] : Group with members, some user(s) has this group as primary group')
-                print('  DN users:')
-                for user in [u.entry_dn for u in conn.entries]: print('         %s' % user)
+                print('    DN users:')
+                for user in [u.entry_dn for u in conn.entries]: print('    %s' % user)
             else:
                 conn.delete(self.group)
                 if not conn.search(**search):
@@ -123,10 +123,30 @@ class Config:
             print('[Error] : The group %s does not existe' % self.group)
 
     def del_member(self, conn):
-        print(self.changetype, self.binddn, self.bindpw, self.user, self.group)
+        cn_group = self.group.split(',')[0]
+        users = self.user_member(conn, self.ou_groups, self.user, cn_group, 'memberUid', member=True)
+        change = {'memberUid': [(MODIFY_DELETE, users)]}
+        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group) and users:
+            conn.modify(self.group, change)
+            print('[Del members] - Group %s: %s' % (self.args.group, users))
+            not_members = set(self.user) - set(users)
+            if not_members:
+                print('[Note] : User(s) is/are not member(s) of group %s: %s' (self.args.group, not_members))
+        else:
+            print('[Error] : User(s) is/are not member(s) of group %s: %s' % (self.args.group, self.user))
 
     def add_member(self, conn):
-        print(self.changetype, self.binddn, self.bindpw, self.user, self.group)
+        cn_group = self.group.split(',')[0]
+        users = self.user_member(conn, self.ou_groups, self.user, cn_group, 'memberUid', member=False)
+        change = {'memberUid': [(MODIFY_ADD, users)]}
+        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group) and users:
+            conn.modify(self.group, change)
+            print('[Add members] - Group %s: %s' % (self.args.group, users))
+            not_members = set(self.user) - set(users)
+            if not_members:
+                print('[Note] : User(s) already member(s) of group %s: %s' (self.args.group, not_members))
+        else:
+            print('[Error] : User(s) already member(s) of group %s: %s' % (self.args.group, self.user))
 
     def action(self, conn):
         act = self.__getattribute__(self.changetype)
@@ -141,7 +161,8 @@ class Config:
 
     @property
     def user(self):
-        return self.dn(self.args.user, self.ou_users)
+        #return self.dn(self.args.user, self.ou_users)
+        return self.args.user.split(',')
 
     @property
     def group(self):
@@ -179,11 +200,27 @@ class Config:
         conn.search(**search)
         return sorted([nid.gidnumber.value for nid in conn.entries])[-1] + 1
 
+    @staticmethod
+    def user_member(conn, base, users, group, attribute, member=True):
+        def valida(func, **kargs):
+            if member:
+                if func(**kargs): return True
+            else:
+                if not func(**kargs): return True
+        ans = []
+        for user in users:
+            search = {
+                'search_base': base,
+                'search_filter': '(&(objectClass=posixGroup)(%s)(%s=%s))' % (group, attribute, user),
+                'attributes': [attribute]
+            }
+            if valida(conn.search, **search): ans.append(user)
+        return ans
+
 def connect(config):
     server = Server(config.server, port=config.port, get_info=ALL)
     conn = Connection(server, user=config.binddn, password=config.bindpw)
     if conn.bind():
-        print('[LDAP] - Conneted')
         return conn
     else:
         print('Usuario ou senha invalido:')
