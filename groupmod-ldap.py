@@ -3,7 +3,7 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-24 23:10]
+#     Last Modified       :     [2018-07-25 01:16]
 #     Description         :      
 #################################################################################
 
@@ -126,27 +126,33 @@ class Config:
         cn_group = self.group.split(',')[0]
         users = self.user_member(conn, self.ou_groups, self.user, cn_group, 'memberUid', member=True)
         change = {'memberUid': [(MODIFY_DELETE, users)]}
-        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group) and users:
-            conn.modify(self.group, change)
-            print('[Del members] - Group %s: %s' % (self.args.group, users))
-            not_members = set(self.user) - set(users)
-            if not_members:
-                print('[Note] : User(s) is/are not member(s) of group %s: %s' (self.args.group, not_members))
+        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group):
+            if users:
+                conn.modify(self.group, change)
+                print('[Del members] - Group %s: %s' % (self.args.group, users))
+                not_members = set(self.user) - set(users)
+                if not_members:
+                    print('[Note] : User(s) is/are not member(s) of group %s: %s' (self.args.group, not_members))
+            else:
+                print('[Error] : User(s) is/are not member(s) of group %s: %s' % (self.args.group, self.user))
         else:
-            print('[Error] : User(s) is/are not member(s) of group %s: %s' % (self.args.group, self.user))
+            print('[Error] : Group %s does not exist' % self.args.group)
 
     def add_member(self, conn):
         cn_group = self.group.split(',')[0]
         users = self.user_member(conn, self.ou_groups, self.user, cn_group, 'memberUid', member=False)
         change = {'memberUid': [(MODIFY_ADD, users)]}
-        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group) and users:
-            conn.modify(self.group, change)
-            print('[Add members] - Group %s: %s' % (self.args.group, users))
-            not_members = set(self.user) - set(users)
-            if not_members:
-                print('[Note] : User(s) already member(s) of group %s: %s' (self.args.group, not_members))
+        if conn.search(self.ou_groups, '(&(objectclass=posixGroup)(%s))' % cn_group):
+            if users:
+                conn.modify(self.group, change)
+                print('[Add members] - Group %s: %s' % (self.args.group, users))
+                not_members = set(self.user) - set(users)
+                if not_members:
+                    print('[Note] : User(s) already member(s) of group %s: %s' (self.args.group, not_members))
+            else:
+                print('[Error] : User(s) already member(s) of group %s: %s' % (self.args.group, self.user))
         else:
-            print('[Error] : User(s) already member(s) of group %s: %s' % (self.args.group, self.user))
+            print('[Error] : Group %s does not exist' % self.args.group)
 
     def action(self, conn):
         act = self.__getattribute__(self.changetype)
@@ -220,11 +226,12 @@ class Config:
 def connect(config):
     server = Server(config.server, port=config.port, get_info=ALL)
     conn = Connection(server, user=config.binddn, password=config.bindpw)
-    if conn.bind():
+    conn.bind()
+    if conn.bound:
         return conn
     else:
-        print('Usuario ou senha invalido:')
-        return False
+        print('[ERROR] - Usuario ou senha invalido:')
+        sys.exit(1)
 
 if __name__ == '__main__':
     config = Config(parser)
