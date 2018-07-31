@@ -3,7 +3,7 @@
 #     File Name           :     groupadd.py
 #     Created By          :     Eloi Silva
 #     Creation Date       :     [2018-07-12 19:21]
-#     Last Modified       :     [2018-07-25 01:16]
+#     Last Modified       :     [2018-07-31 17:12]
 #     Description         :      
 #################################################################################
 
@@ -132,7 +132,7 @@ class Config:
                 print('[Del members] - Group %s: %s' % (self.args.group, users))
                 not_members = set(self.user) - set(users)
                 if not_members:
-                    print('[Note] : User(s) is/are not member(s) of group %s: %s' (self.args.group, not_members))
+                    print('[Note] : User(s) is/are not member(s) of group %s: %s' % (self.args.group, not_members))
             else:
                 print('[Error] : User(s) is/are not member(s) of group %s: %s' % (self.args.group, self.user))
         else:
@@ -148,7 +148,7 @@ class Config:
                 print('[Add members] - Group %s: %s' % (self.args.group, users))
                 not_members = set(self.user) - set(users)
                 if not_members:
-                    print('[Note] : User(s) already member(s) of group %s: %s' (self.args.group, not_members))
+                    print('[Note] : User(s) already member(s) of group %s: %s' % (self.args.group, not_members))
             else:
                 print('[Error] : User(s) already member(s) of group %s: %s' % (self.args.group, self.user))
         else:
